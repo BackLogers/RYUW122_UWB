@@ -1,17 +1,20 @@
+RYUW122 - UWB module
+========================================
+
+[![RYUW122-Lite module](https://raw.githubusercontent.com/BackLogers/RYUW122_UWB/refs/heads/main/images/RYUW122-LITE.jpg)](https://github.com/BackLogers/RYUW122_UWB/tree/main)
+
+UART Interface 6.5 GHz and 8 GHz UWB Antenna Transceiver Module.
+
 ## Description
 
 This library is designed specifically for the **RYUW122** UWB module from **REYAX Technology**, providing access to all available features.  
 It focuses on **ease of use**, **performance optimization** (especially for fast distance measurements), **minimal memory footprint**, and **no external library dependencies**.
-
----
 
 ## Features
 
 - Full support for **bidirectional communication** between modules  
 - **Distance measurement** in Anchor ↔ Tag configuration  
 - **Reading and modifying** module parameters  
-
----
 
 ## Module Information
 
@@ -20,7 +23,8 @@ It focuses on **ease of use**, **performance optimization** (especially for fast
   - The maximum message size is 12 bytes.
   - The tag cannot send messages to the anchor — it can only respond when polled by an anchor.
   - The tag does not know which anchor sent the message — it only receives the content and length.
-- It is strongly recommended to use the maximum supported baud rate (115200). Using lower values can more than double the time required for distance measurement.
+- Although this library supports SoftwareSerial, it is strongly recommended to use a hardware UART to ensure reliable communication and correct operation.
+- It is recommended to use the maximum supported baud rate (115200). Using lower values can more than double the time required for distance measurement.
 - Note that any change in baud rate is stored in the module’s flash memory. Power cycling does **not** restore default settings.
 - When changing parameters stored in flash (e.g., address or mode), the module may become temporarily unresponsive. A small delay (handled by the library) is necessary.
 - The maximum distance measurement frequency is approximately 16 Hz.
@@ -40,10 +44,9 @@ It focuses on **ease of use**, **performance optimization** (especially for fast
   Therefore, avoid performing such operations too frequently.  
   If frequent parameter updates are needed (e.g., dynamic tag reply messages), it's better to restart the module and change only the required values — the library supports this approach.
 
----
-
 ## To-do
 
+- [ ] Add advanced examples
 - [ ] Asynchronous message transmission  
 - [ ] Improved error handling  
 - [ ] Complete library documentation  
