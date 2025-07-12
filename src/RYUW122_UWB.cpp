@@ -154,26 +154,15 @@ bool RYUW122_UWB::setBandwidth(RYUW122_Bandwidth bandwidth)
     return result;
 }
 
-bool RYUW122_UWB::setNetworkID(const char *networkID)
+bool RYUW122_UWB::setNetworkID(const char* networkID, size_t len)
 {
-    size_t len = strlen(networkID);
-    if (len > 8)
-    {
-        return false;
-    }
+    if (!networkID) return false;
+    if (len == 0) len = strnlen(networkID, 9); 
+    if (len > 8) return false;
 
-    clearMessageBuffer();
-    
-    // Copy the actual network ID
     memcpy(messageBuffer, networkID, len);
+    if (len < 8) memset(messageBuffer + len, ' ', 8 - len);
 
-    // Pad with spaces if it's shorter than 8 characters
-    if (len < 8)
-    {
-        memset(messageBuffer + len, ' ', 8 - len);
-    }
-
-    // Send exactly 8 characters as the value
     sendCommandWithValue("AT+NETWORKID=", messageBuffer, 8);
 
     bool result = readResponse("OK\r\n", moduleResponseTimeout);
@@ -181,41 +170,31 @@ bool RYUW122_UWB::setNetworkID(const char *networkID)
     return result;
 }
 
-bool RYUW122_UWB::setAddress(const char *address)
+bool RYUW122_UWB::setAddress(const char* address, size_t len)
 {
-    size_t len = strlen(address);
-    if (len > 8) {
-        return false;  // Address must be max 8 characters
-    }
+    if (!address) return false;
+    if (len == 0) len = strnlen(address, 9); 
+    if (len > 8) return false;
 
-    clearMessageBuffer();
-
-    // Copy the address into the buffer
     memcpy(messageBuffer, address, len);
+    if (len < 8) memset(messageBuffer + len, ' ', 8 - len);
 
-    // Pad with spaces if the address is shorter than 8 characters
-    if (len < 8) {
-        memset(messageBuffer + len, ' ', 8 - len);
-    }
-
-    // Send exactly 8 characters as required
     sendCommandWithValue("AT+ADDRESS=", messageBuffer, 8);
 
-    // Wait for confirmation and delay for flash write
     bool result = readResponse("OK\r\n", moduleResponseTimeout);
     delay(afterResponseDelay);
     return result;
 }
 
-bool RYUW122_UWB::setPassword(const char *password)
+bool RYUW122_UWB::setPassword(const char* password, size_t len)
 {
-    if (strlen(password) > 32)
-    {
-        return false;
-    }
+    if (!password) return false;
+    if (len == 0) len = strnlen(password, 33); 
+    if (len > 32) return false;
 
-    sendCommandWithValue("AT+CPIN=", password);
-    bool result = (readResponse("OK\r\n", moduleResponseTimeout));
+    sendCommandWithValue("AT+CPIN=", password, len);
+
+    bool result = readResponse("OK\r\n", moduleResponseTimeout);
     delay(afterResponseDelay);
     return result;
 }
@@ -234,79 +213,71 @@ bool RYUW122_UWB::setTagParameters(uint16_t enableTime, uint16_t disableTime)
     return result;
 }
 
-bool RYUW122_UWB::sendMessage(const char *address, const char *message, bool padToMaxLength)
+bool RYUW122_UWB::sendMessage(const char* address, const char* message, size_t addressLen, size_t messageLen, bool padToMaxLength)
 {
-    // Check if the address is valid (must be max 8 characters)
-    size_t addrLen = strlen(address);
-    if (addrLen > 8) return false;
+    if (!address || !message) return false;
 
-    // Check if the message is valid (must be max 12 characters)
-    size_t msgLen = strlen(message);
-    if (msgLen > 12 || msgLen == 0) return false; // Empty message is not allowed
+    if (addressLen == 0) addressLen = strnlen(address, 9);
+    if (messageLen == 0) messageLen = strnlen(message, 13);
+
+    if (addressLen > 8 || messageLen == 0 || messageLen > 12) return false;
 
     clearMessageBuffer();
 
-    // Pad the address with spaces to ensure it is exactly 8 characters long
+    // Pad the address with spaces to ensure it is exactly 8 characters
     memset(messageBuffer, ' ', 8);
-    memcpy(messageBuffer, address, addrLen);
+    memcpy(messageBuffer, address, addressLen);
 
     char* ptr = messageBuffer + 8;
-    int finalLen = padToMaxLength ? 12 : msgLen;
+    size_t finalLen = padToMaxLength ? 12 : messageLen;
 
-    // Add message length prefix (e.g., ",12,")
+    // Add the header: ,len,
     int n = snprintf(ptr, sizeof(messageBuffer) - 8, ",%d,", finalLen);
     if (n < 0 || (size_t)n >= sizeof(messageBuffer) - 8) return false;
 
     ptr += n;
 
     // Copy message content
-    memcpy(ptr, message, msgLen);
+    memcpy(ptr, message, messageLen);
 
-    // Pad the message with spaces if required
-    if (padToMaxLength && msgLen < 12) {
-        memset(ptr + msgLen, ' ', 12 - msgLen);
-    }
+    // Pad message to 12 bytes if requested
+    if (padToMaxLength && messageLen < 12)
+        memset(ptr + messageLen, ' ', 12 - messageLen);
 
-    // Send the complete command
     sendCommandWithValue("AT+ANCHOR_SEND=", messageBuffer);
     return readResponse("OK\r\n", moduleResponseTimeout);
 }
 
-bool RYUW122_UWB::setTagResponseMessage(const char *message, bool restart, bool padToMaxLength)
-{
-    uint8_t len = strlen(message);
-    if (len > 12) {
-        return false;  // Reject messages longer than 12 characters
+bool RYUW122_UWB::sendMessage(const char* address, const char* message, bool padToMaxLength) {
+    return sendMessage(address, message, 0, 0, padToMaxLength);
+}
+
+bool RYUW122_UWB::setTagResponseMessage(const char* message, size_t messageLen, bool restart, bool padToMaxLength) {
+    if (messageLen == 0) {
+        messageLen = strnlen(message, 13); // Max 12 chars + terminator
     }
+    if (messageLen == 0 || messageLen > 12) return false;
 
-    // Determine final message length
-    uint8_t finalLen = padToMaxLength ? 12 : len;
-
+    size_t finalLen = padToMaxLength ? 12 : messageLen;
     clearMessageBuffer();
 
-    // Write "<len>," prefix
-    int n = snprintf(messageBuffer, sizeof(messageBuffer), "%d,", finalLen);
-    if (n < 0 || (size_t)n >= sizeof(messageBuffer)) {
-        return false;
+    int n = snprintf(messageBuffer, sizeof(messageBuffer), "%u,", (unsigned)finalLen);
+    if (n < 0 || (size_t)n >= sizeof(messageBuffer)) return false;
+
+    memcpy(messageBuffer + n, message, messageLen);
+
+    if (padToMaxLength && messageLen < 12) {
+        memset(messageBuffer + n + messageLen, ' ', 12 - messageLen);
     }
 
-    // Copy message content
-    memcpy(messageBuffer + n, message, len);
-
-    // Pad with spaces if needed
-    if (padToMaxLength && len < 12) {
-        memset(messageBuffer + n + len, ' ', 12 - len);
-    }
-
-    // Optional module reset
-    if (restart) {
-        reset();
-    }
+    if (restart) reset();
 
     sendCommandWithValue("AT+TAG_SEND=", messageBuffer);
-
-    // Wait for confirmation
     return readResponse("OK\r\n", moduleResponseTimeout);
+}
+
+bool RYUW122_UWB::setTagResponseMessage(const char* message, bool restart, bool padToMaxLength) {
+    return setTagResponseMessage(message, 0, restart, padToMaxLength);
 }
 
 bool RYUW122_UWB::receiveMessage(RYUW122_MessageInfo &info, uint16_t timeout)
@@ -463,7 +434,9 @@ bool RYUW122_UWB::getBandwidth(RYUW122_Bandwidth &bandwidth)
 
 bool RYUW122_UWB::getNetworkID(char* buffer, size_t bufferSize)
 {
-    if (bufferSize < 9)
+    const size_t expectedLen = 8; 
+
+    if (bufferSize < expectedLen) 
         return false;
 
     sendCommand("AT+NETWORKID?");
@@ -478,8 +451,12 @@ bool RYUW122_UWB::getNetworkID(char* buffer, size_t bufferSize)
             if (newline)
                 *newline = '\0';
 
-            strncpy(buffer, id, bufferSize - 1);
-            buffer[bufferSize - 1] = '\0';
+            if (bufferSize == expectedLen) {
+                memcpy(buffer, id, expectedLen);
+            } else {
+                strncpy(buffer, id, bufferSize - 1);
+                buffer[bufferSize - 1] = '\0';
+            }
             return true;
         }
     }
@@ -488,8 +465,10 @@ bool RYUW122_UWB::getNetworkID(char* buffer, size_t bufferSize)
 
 bool RYUW122_UWB::getAddress(char* buffer, size_t bufferSize)
 {
-    if (bufferSize < 9)
-        return false;
+    const size_t expectedLen = 8; 
+
+    if (bufferSize < expectedLen) 
+        return false; 
 
     sendCommand("AT+ADDRESS?");
     if (readResponse("\r\n", moduleResponseTimeout))
@@ -503,8 +482,12 @@ bool RYUW122_UWB::getAddress(char* buffer, size_t bufferSize)
             if (newline)
                 *newline = '\0';
 
-            strncpy(buffer, id, bufferSize - 1);
-            buffer[bufferSize - 1] = '\0';
+            if (bufferSize == expectedLen) {
+                memcpy(buffer, id, expectedLen);
+            } else {
+                strncpy(buffer, id, bufferSize - 1);
+                buffer[bufferSize - 1] = '\0';
+            }
             return true;
         }
     }
@@ -513,8 +496,10 @@ bool RYUW122_UWB::getAddress(char* buffer, size_t bufferSize)
 
 bool RYUW122_UWB::getUID(char* buffer, size_t bufferSize)
 {
-    if (bufferSize < 13)
-        return false;
+    const size_t expectedLen = 12; 
+
+    if (bufferSize < expectedLen)
+        return false; 
 
     sendCommand("AT+UID?");
     if (readResponse("\r\n", moduleResponseTimeout))
@@ -528,8 +513,12 @@ bool RYUW122_UWB::getUID(char* buffer, size_t bufferSize)
             if (newline)
                 *newline = '\0';
 
-            strncpy(buffer, id, bufferSize - 1);
-            buffer[bufferSize - 1] = '\0';
+            if (bufferSize == expectedLen) {
+                memcpy(buffer, id, expectedLen);
+            } else {
+                strncpy(buffer, id, bufferSize - 1);
+                buffer[bufferSize - 1] = '\0';
+            }
             return true;
         }
     }
@@ -538,7 +527,9 @@ bool RYUW122_UWB::getUID(char* buffer, size_t bufferSize)
 
 bool RYUW122_UWB::getPassword(char *buffer, size_t bufferSize)
 {
-    if (bufferSize < 33)
+    const size_t expectedLen = 32; 
+
+    if (bufferSize < expectedLen)
         return false;
 
     sendCommand("AT+CPIN?");
@@ -553,8 +544,12 @@ bool RYUW122_UWB::getPassword(char *buffer, size_t bufferSize)
             if (newline)
                 *newline = '\0';
 
-            strncpy(buffer, pwd, bufferSize - 1);
-            buffer[bufferSize - 1] = '\0';
+            if (bufferSize == expectedLen) {
+                memcpy(buffer, pwd, expectedLen);
+            } else {
+                strncpy(buffer, pwd, bufferSize - 1);
+                buffer[bufferSize - 1] = '\0';
+            }
             return true;
         }
     }

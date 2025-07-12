@@ -9,7 +9,7 @@
 
 #include <Arduino.h>
 
-enum RYUW122_Mode
+enum RYUW122_Mode : int8_t
 {
     MODE_TAG = 0,
     MODE_ANCHOR = 1,
@@ -17,7 +17,7 @@ enum RYUW122_Mode
     MODE_UNKNOWN = -1
 };
 
-enum RYUW122_BaudRate
+enum RYUW122_BaudRate : int8_t
 {
     BAUD_9600 = 0,
     BAUD_57600 = 1,
@@ -25,14 +25,14 @@ enum RYUW122_BaudRate
     BAUD_UNKNOWN = -1
 };
 
-enum RYUW122_Channel
+enum RYUW122_Channel : int8_t
 {
     CHANNEL_6489_6_MHz = 0,
     CHANNEL_7987_2_MHz = 1,
     CHANNEL_UNKNOWN = -1
 };
 
-enum RYUW122_Bandwidth
+enum RYUW122_Bandwidth : int8_t
 {
     BANDWIDTH_850_Kbps = 0,
     BANDWIDTH_6_8_Mbps = 1,
@@ -41,9 +41,9 @@ enum RYUW122_Bandwidth
 
 struct RYUW122_MessageInfo
 {
-    char address[9];
+    char address[9];        //8 chars + null terminator
     uint8_t payloadLength;
-    char payload[13];
+    char payload[13];       //12 chars + null terminator
     uint16_t distance;
 };
 
@@ -70,11 +70,13 @@ public:
     bool setBaudRate(RYUW122_BaudRate baudRate);
     bool setChannel(RYUW122_Channel channel);
     bool setBandwidth(RYUW122_Bandwidth bandwidth);
-    bool setNetworkID(const char *networkID);
-    bool setAddress(const char *address);
-    bool setPassword(const char *password);
+    bool setNetworkID(const char *networkID, size_t len = 0);
+    bool setAddress(const char *address, size_t len = 0);
+    bool setPassword(const char *password, size_t len = 0);
     bool setTagParameters(uint16_t enableTime = 0, uint16_t disableTime = 0);
+    bool sendMessage(const char *address, const char *message, size_t addressLen = 0, size_t messageLen = 0, bool padToMaxLength = false);
     bool sendMessage(const char *address, const char *message, bool padToMaxLength = false);
+    bool setTagResponseMessage(const char *message, size_t messageLen = 0, bool restart = false, bool padToMaxLength = false);
     bool setTagResponseMessage(const char *message, bool restart = false, bool padToMaxLength = false);
     bool receiveMessage(RYUW122_MessageInfo &info, uint16_t timeout = 0);
     bool setCalibrationDistance(int8_t distance);
