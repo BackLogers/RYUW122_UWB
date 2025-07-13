@@ -308,9 +308,9 @@ bool RYUW122_UWB::receiveMessage(RYUW122_MessageInfo &info, uint16_t timeout)
     return false;
 }
 
-bool RYUW122_UWB::receiveMessageAsync(RYUW122_MessageInfo &info)
+RYUW122_MessageState RYUW122_UWB::receiveMessageAsync(RYUW122_MessageInfo &info)
 {
-    if (!isAsyncMessageSend()) return false;
+    if (!isAsyncMessageSend()) return MESSAGE_NOT_REQUESTED;
 
     while (readResponseAsync("\r\n"))  // Read lines while data is available
     {
@@ -326,14 +326,16 @@ bool RYUW122_UWB::receiveMessageAsync(RYUW122_MessageInfo &info)
         {
             bool success = parseAnchorResponse(messageBuffer, info);
             resetAsyncMessage(); // Async communication completed successfully
-            return success;
+            if (success) return MESSAGE_RECEIVED; 
+            return MESSAGE_PARSE_ERROR; // Parsing failed, but we received a response
         }
 
         if (strstr(messageBuffer, "TAG_RCV="))
         {
             bool success = parseTagResponse(messageBuffer, info);
             resetAsyncMessage(); // Async communication completed successfully
-            return success;
+            if (success) return MESSAGE_RECEIVED; 
+            return MESSAGE_PARSE_ERROR; // Parsing failed, but we received a response
         }
 
         // Received an unexpected line, clear the buffer and wait for the next
@@ -344,9 +346,10 @@ bool RYUW122_UWB::receiveMessageAsync(RYUW122_MessageInfo &info)
     // Check for timeout – reset the async state if no valid response was received in time
     if (millis() > expectedAsyncMessageTime) {
         resetAsyncMessage();
+        return MESSAGE_TIMEOUT;
     }
 
-    return false;
+    return MESSAGE_WAITING; // Still waiting for a response
 }
 
 

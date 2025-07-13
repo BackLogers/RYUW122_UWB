@@ -47,6 +47,16 @@ struct RYUW122_MessageInfo
     uint16_t distance;
 };
 
+enum RYUW122_MessageState : int8_t
+{
+    MESSAGE_RECEIVED       =  1,  // Response received and successfully parsed
+    MESSAGE_NOT_REQUESTED  =  0,  // No async message was initiated
+    MESSAGE_WAITING        = -1,  // Waiting for async response
+    MESSAGE_TIMEOUT        = -2,  // Timeout occurred
+    MESSAGE_PARSE_ERROR    = -3,  // Response received but could not be parsed
+    MESSAGE_UNKNOWN        = -4   // Unknown or undefined state
+};
+
 const char *toString(RYUW122_Mode mode);
 const char *toString(RYUW122_BaudRate rate);
 const char *toString(RYUW122_Channel channel);
@@ -78,7 +88,7 @@ public:
     bool sendMessageAsync(const char *address, const char *message, size_t addressLen = 0, size_t messageLen = 0, bool padToMaxLength = false);
     bool setTagResponseMessage(const char *message, size_t messageLen = 0, bool restart = false, bool padToMaxLength = false);
     bool receiveMessage(RYUW122_MessageInfo &info, uint16_t timeout = 0);
-    bool receiveMessageAsync(RYUW122_MessageInfo &info);
+    RYUW122_MessageState receiveMessageAsync(RYUW122_MessageInfo &info);
     bool setCalibrationDistance(int8_t distance);
 
     bool getMode(RYUW122_Mode &mode);
