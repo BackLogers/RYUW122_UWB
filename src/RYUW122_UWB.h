@@ -115,6 +115,7 @@ private:
     void clearMessageBuffer();
     void resetAsyncMessage();
     bool isAsyncMessageSend();
+    bool isAsyncResponseExpected();
 };
 
 #endif // RYUW122_UWB_H
