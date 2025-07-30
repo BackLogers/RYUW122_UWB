@@ -213,7 +213,7 @@ bool RYUW122_UWB::setTagParameters(uint16_t enableTime, uint16_t disableTime)
     return result;
 }
 
-bool RYUW122_UWB::sendMessage(const char* address, const char* message, size_t addressLen, size_t messageLen, bool padToMaxLength)
+bool RYUW122_UWB::sendMessage(const char* address, const char* message, size_t addressLen, size_t messageLen, bool padToMaxLength, bool sendAsync)
 {
     if (!address || !message) return false;
 
@@ -245,14 +245,25 @@ bool RYUW122_UWB::sendMessage(const char* address, const char* message, size_t a
         memset(ptr + messageLen, ' ', 12 - messageLen);
 
     sendCommandWithValue("AT+ANCHOR_SEND=", messageBuffer);
+
+    if (sendAsync) return true; // For async, we don't wait for response
     return readResponse("OK\r\n", moduleResponseTimeout);
 }
 
-bool RYUW122_UWB::sendMessage(const char* address, const char* message, bool padToMaxLength) {
-    return sendMessage(address, message, 0, 0, padToMaxLength);
+bool RYUW122_UWB::sendMessageAsync(const char* address, const char* message, size_t addressLen, size_t messageLen, bool padToMaxLength) 
+{
+    if (isAsyncMessageSend()) return false; // Cannot send another async message while waiting for a response. Do not reset async message state.
+
+    bool result = sendMessage(address, message, addressLen, messageLen, padToMaxLength, true);
+    if (!result) return false; // Message have wrong format or size
+
+    expectedAsyncMessageTime = millis() + moduleResponseTimeout; // Set expected time for response
+    clearMessageBuffer(); // Clear message buffer for next response
+    return true; // Async message sent successfully
 }
 
-bool RYUW122_UWB::setTagResponseMessage(const char* message, size_t messageLen, bool restart, bool padToMaxLength) {
+bool RYUW122_UWB::setTagResponseMessage(const char* message, size_t messageLen, bool restart, bool padToMaxLength) 
+{
     if (messageLen == 0) {
         messageLen = strnlen(message, 13); // Max 12 chars + terminator
     }
@@ -276,10 +287,6 @@ bool RYUW122_UWB::setTagResponseMessage(const char* message, size_t messageLen, 
     return readResponse("OK\r\n", moduleResponseTimeout);
 }
 
-bool RYUW122_UWB::setTagResponseMessage(const char* message, bool restart, bool padToMaxLength) {
-    return setTagResponseMessage(message, 0, restart, padToMaxLength);
-}
-
 bool RYUW122_UWB::receiveMessage(RYUW122_MessageInfo &info, uint16_t timeout)
 {
     if (timeout == 0)
@@ -300,6 +307,71 @@ bool RYUW122_UWB::receiveMessage(RYUW122_MessageInfo &info, uint16_t timeout)
     }
     return false;
 }
+
+RYUW122_MessageState RYUW122_UWB::receiveMessageAsyncAnchor(RYUW122_MessageInfo &info)
+{
+    if (!isAsyncMessageSend()) return MESSAGE_NOT_REQUESTED;
+
+    while (readResponseAsync("\r\n"))  // Read lines while data is available
+    {
+        if (strstr(messageBuffer, "OK\r\n"))
+        {
+            // Ignore the "OK" response, read the next line
+            indexAsyncMessage = 0;
+            clearMessageBuffer();
+            continue;
+        }
+
+        if (strstr(messageBuffer, "ANCHOR_RCV="))
+        {
+            bool success = parseAnchorResponse(messageBuffer, info);
+            resetAsyncMessage(); // Async communication completed successfully
+            if (success) return MESSAGE_RECEIVED; 
+            return MESSAGE_PARSE_ERROR; // Parsing failed, but we received a response
+        }
+
+        // Received an unexpected line, clear the buffer and wait for the next
+        indexAsyncMessage = 0;
+        clearMessageBuffer();
+    }
+
+    // Check for timeout – reset the async state if no valid response was received in time
+    if (millis() > expectedAsyncMessageTime) {
+        resetAsyncMessage();
+        return MESSAGE_TIMEOUT;
+    }
+
+    return MESSAGE_WAITING; // Still waiting for a response
+}
+
+RYUW122_MessageState RYUW122_UWB::receiveMessageAsyncTag(RYUW122_MessageInfo &info)
+{
+    while (readResponseAsync("\r\n"))  // Read lines while data is available
+    {
+        if (strstr(messageBuffer, "OK\r\n"))
+        {
+            // Ignore the "OK" response, read the next line
+            indexAsyncMessage = 0;
+            clearMessageBuffer();
+            continue;
+        }
+
+        if (strstr(messageBuffer, "TAG_RCV="))
+        {
+            bool success = parseTagResponse(messageBuffer, info);
+            resetAsyncMessage(); // Async communication completed successfully
+            if (success) return MESSAGE_RECEIVED; 
+            return MESSAGE_PARSE_ERROR; // Parsing failed, but we received a response
+        }
+
+        // Received an unexpected line, clear the buffer and wait for the next
+        indexAsyncMessage = 0;
+        clearMessageBuffer();
+    }
+
+    return MESSAGE_WAITING; // Still waiting for a response   
+}
+
 
 bool RYUW122_UWB::setCalibrationDistance(int8_t distance)
 {
@@ -744,6 +816,58 @@ bool RYUW122_UWB::readResponse(const char *expectedResponse, uint32_t timeout)
     }
 
     return strstr(messageBuffer, expectedResponse) != nullptr;
+}
+
+bool RYUW122_UWB::readResponseAsync(const char *expectedResponse)
+{
+    while (_serial.available())
+    {
+        char c = _serial.read();
+
+        if (indexAsyncMessage < sizeof(messageBuffer) - 1)
+        {
+            messageBuffer[indexAsyncMessage++] = c;
+            messageBuffer[indexAsyncMessage] = '\0';
+        }
+
+        if (strstr(messageBuffer, expectedResponse))
+        {
+            return true;
+        }
+    }
+
+    return false; // No response found yet
+}
+
+void RYUW122_UWB::resetAsyncMessage()
+{
+    indexAsyncMessage = 0;
+    expectedAsyncMessageTime = 0;
+    clearMessageBuffer();
+    while (_serial.available()) _serial.read(); // Clear serial buffer to avoid any leftover data
+}
+
+bool RYUW122_UWB::isAsyncMessageSend()
+{
+    if (expectedAsyncMessageTime != 0)// Message is being sent
+    {
+        return true; // Message is being sent and response is still expected
+    }
+    return false; // No async message is being sent
+}
+
+bool RYUW122_UWB::isAsyncResponseExpected()
+{
+    if (expectedAsyncMessageTime != 0) // A message was sent
+    {
+        if(millis() > expectedAsyncMessageTime) // But the response was not received in time
+        {
+            resetAsyncMessage(); // Clear the async state
+            return false;
+        }
+        return true; // Still waiting for the response
+    }
+    return false; // No message was sent
 }
 
 const char* toString(RYUW122_Mode mode) {

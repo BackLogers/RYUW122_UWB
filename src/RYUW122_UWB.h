@@ -47,6 +47,16 @@ struct RYUW122_MessageInfo
     uint16_t distance;
 };
 
+enum RYUW122_MessageState : int8_t
+{
+    MESSAGE_RECEIVED       =  1,  // Response received and successfully parsed
+    MESSAGE_NOT_REQUESTED  =  0,  // No async message was initiated
+    MESSAGE_WAITING        = -1,  // Waiting for async response
+    MESSAGE_TIMEOUT        = -2,  // Timeout occurred
+    MESSAGE_PARSE_ERROR    = -3,  // Response received but could not be parsed
+    MESSAGE_UNKNOWN        = -4   // Unknown or undefined state
+};
+
 const char *toString(RYUW122_Mode mode);
 const char *toString(RYUW122_BaudRate rate);
 const char *toString(RYUW122_Channel channel);
@@ -74,11 +84,12 @@ public:
     bool setAddress(const char *address, size_t len = 0);
     bool setPassword(const char *password, size_t len = 0);
     bool setTagParameters(uint16_t enableTime = 0, uint16_t disableTime = 0);
-    bool sendMessage(const char *address, const char *message, size_t addressLen = 0, size_t messageLen = 0, bool padToMaxLength = false);
-    bool sendMessage(const char *address, const char *message, bool padToMaxLength = false);
+    bool sendMessage(const char *address, const char *message, size_t addressLen = 0, size_t messageLen = 0, bool padToMaxLength = false, bool sendAsync = false);
+    bool sendMessageAsync(const char *address, const char *message, size_t addressLen = 0, size_t messageLen = 0, bool padToMaxLength = false);
     bool setTagResponseMessage(const char *message, size_t messageLen = 0, bool restart = false, bool padToMaxLength = false);
-    bool setTagResponseMessage(const char *message, bool restart = false, bool padToMaxLength = false);
     bool receiveMessage(RYUW122_MessageInfo &info, uint16_t timeout = 0);
+    RYUW122_MessageState receiveMessageAsyncAnchor(RYUW122_MessageInfo &info);
+    RYUW122_MessageState receiveMessageAsyncTag(RYUW122_MessageInfo &info);
     bool setCalibrationDistance(int8_t distance);
 
     bool getMode(RYUW122_Mode &mode);
@@ -93,6 +104,8 @@ public:
     bool getCalibrationDistance(int8_t &distance);
     bool getFirmwareVersion(char *buffer, size_t bufferSize);
 
+    bool isAsyncMessageSend();
+
 private:
     static constexpr size_t MessageBufferSize = 50;
     char messageBuffer[MessageBufferSize];
@@ -102,13 +115,19 @@ private:
     uint16_t distanceResponseTimeout = 200; // Timeout for distance response from module
     int16_t resetPin = -1;                  // Pin for hardware reset, -1 means no reset pin used
 
+    size_t indexAsyncMessage = 0;
+    unsigned long expectedAsyncMessageTime = 0; // Last time a response was received
+
     Stream &_serial;
     void sendCommandWithValue(const char *cmd, const char *val, uint8_t valLength = 0);
     void sendCommand(const char *cmd);
     bool readResponse(const char *expectedResponse, uint32_t timeout);
+    bool readResponseAsync(const char *expectedResponse);
     bool parseAnchorResponse(char *response, RYUW122_MessageInfo &info);
     bool parseTagResponse(char *response, RYUW122_MessageInfo &info);
     void clearMessageBuffer();
+    void resetAsyncMessage();
+    bool isAsyncResponseExpected();
 };
 
 #endif // RYUW122_UWB_H
