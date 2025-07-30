@@ -1,7 +1,8 @@
 RYUW122 - UWB module
 ========================================
 
-[![RYUW122-Lite module](https://raw.githubusercontent.com/BackLogers/RYUW122_UWB/refs/heads/main/images/RYUW122-LITE.jpg)](https://github.com/BackLogers/RYUW122_UWB/tree/main)
+[![RYUW122-Lite module](https://raw.githubusercontent.com/BackLogers/RYUW122_UWB/refs/heads/main/images/RYUW122-LITE.jpg)](https://github.com/BackLogers/RYUW122_UWB/tree/main) 
+[![RYUW122-mikroBUS module](https://raw.githubusercontent.com/BackLogers/RYUW122_UWB/refs/heads/main/images/RYUW122-Custom-mikroBUS.jpg)](https://github.com/BackLogers/RYUW122_UWB/tree/main)
 
 UART Interface 6.5 GHz and 8 GHz UWB Antenna Transceiver Module.
 
@@ -46,7 +47,7 @@ It focuses on **ease of use**, **performance optimization** (especially for fast
 
 ## To-do
 
-- [ ] Add advanced examples
-- [ ] Asynchronous message transmission  
+- [] Add advanced examples
+- [✓] Asynchronous message transmission  
 - [ ] Improved error handling  
 - [ ] Complete library documentation  
