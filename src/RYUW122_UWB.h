@@ -88,7 +88,8 @@ public:
     bool sendMessageAsync(const char *address, const char *message, size_t addressLen = 0, size_t messageLen = 0, bool padToMaxLength = false);
     bool setTagResponseMessage(const char *message, size_t messageLen = 0, bool restart = false, bool padToMaxLength = false);
     bool receiveMessage(RYUW122_MessageInfo &info, uint16_t timeout = 0);
-    RYUW122_MessageState receiveMessageAsync(RYUW122_MessageInfo &info);
+    RYUW122_MessageState receiveMessageAsyncAnchor(RYUW122_MessageInfo &info);
+    RYUW122_MessageState receiveMessageAsyncTag(RYUW122_MessageInfo &info);
     bool setCalibrationDistance(int8_t distance);
 
     bool getMode(RYUW122_Mode &mode);
@@ -102,6 +103,8 @@ public:
     bool getTagParameters(uint16_t &enableTime, uint16_t &disableTime);
     bool getCalibrationDistance(int8_t &distance);
     bool getFirmwareVersion(char *buffer, size_t bufferSize);
+
+    bool isAsyncMessageSend();
 
 private:
     static constexpr size_t MessageBufferSize = 50;
@@ -124,7 +127,6 @@ private:
     bool parseTagResponse(char *response, RYUW122_MessageInfo &info);
     void clearMessageBuffer();
     void resetAsyncMessage();
-    bool isAsyncMessageSend();
     bool isAsyncResponseExpected();
 };
 
