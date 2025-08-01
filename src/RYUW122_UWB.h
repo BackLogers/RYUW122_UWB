@@ -61,6 +61,7 @@ const char *toString(RYUW122_Mode mode);
 const char *toString(RYUW122_BaudRate rate);
 const char *toString(RYUW122_Channel channel);
 const char *toString(RYUW122_Bandwidth bandwidth);
+const int toInt(RYUW122_BaudRate baudRate);
 
 class RYUW122_UWB
 {

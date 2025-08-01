@@ -907,3 +907,13 @@ const char* toString(RYUW122_Bandwidth bandwidth) {
         default: return "INVALID_BANDWIDTH";
     }
 }
+
+const int toInt(RYUW122_BaudRate baudRate) {
+    switch (baudRate) {
+        case BAUD_9600: return 9600;
+        case BAUD_57600: return 57600;
+        case BAUD_115200: return 115200;
+        case BAUD_UNKNOWN: return -1; // Unknown baud rate
+        default: return -1; // Invalid baud rate
+    }
+}
